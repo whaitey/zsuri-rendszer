@@ -3,7 +3,7 @@
  * Plugin Name: Zsuri Rendszer
  * Description: Zsűri szavazási rendszer WordPress plugin
  * Version: 1.0.0
- * Author: Your Name
+ * Author: ZeusWeb
  * Plugin URI: https://github.com/whaitey/zsuri-rendszer-plugin
  * GitHub Plugin URI: https://github.com/whaitey/zsuri-rendszer-plugin
  * GitHub Branch: master

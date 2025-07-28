@@ -105,5 +105,5 @@ A közreműködéseket szívesen fogadjuk! Kérlek:
 
 ---
 
-**Fejlesztő**: Your Name  
+**Fejlesztő**: ZeusWeb  
 **Utolsó frissítés**: 2024. január 
