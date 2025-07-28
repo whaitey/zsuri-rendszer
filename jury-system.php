@@ -1,9 +1,17 @@
 <?php
 /**
- * Plugin Name: Zsűri Rendszer
- * Description: Zsűri felhasználók és kategóriák adminisztrációja, értékelés funkcióval.
- * Version: 1.0
- * Author: ZeusWeb
+ * Plugin Name: Zsuri Rendszer
+ * Description: Zsűri szavazási rendszer WordPress plugin
+ * Version: 1.0.0
+ * Author: Your Name
+ * Plugin URI: https://github.com/whaitey/zsuri-rendszer-plugin
+ * GitHub Plugin URI: https://github.com/whaitey/zsuri-rendszer-plugin
+ * GitHub Branch: master
+ * Requires at least: 5.0
+ * Tested up to: 6.4
+ * Requires PHP: 7.0
+ * License: GPL v2 or later
+ * License URI: https://www.gnu.org/licenses/gpl-2.0.html
  */
 
 if (!defined('ABSPATH')) exit;
