@@ -1,12 +1,11 @@
 <?php
 /**
  * Plugin Name: Zsuri Rendszer
+ * Plugin URI: https://github.com/whaitey/zsuri-rendszer
  * Description: Zsűri szavazási rendszer WordPress plugin
- * Version: 1.0.0
+ * Version: 1.3.4
  * Author: ZeusWeb
- * Plugin URI: https://github.com/whaitey/zsuri-rendszer-plugin
- * GitHub Plugin URI: https://github.com/whaitey/zsuri-rendszer-plugin
- * GitHub Branch: master
+ * Text Domain: zsuri-rendszer
  * Requires at least: 5.0
  * Tested up to: 6.4
  * Requires PHP: 7.0
@@ -15,6 +14,23 @@
  */
 
 if (!defined('ABSPATH')) exit;
+
+// Plugin Update Checker for GitHub updates
+require_once plugin_dir_path(__FILE__) . 'plugin-update-checker/load-v5p6.php';
+
+use YahnisElsts\PluginUpdateChecker\v5p6\PucFactory;
+
+$myUpdateChecker = PucFactory::buildUpdateChecker(
+    'https://github.com/whaitey/zsuri-rendszer',
+    __FILE__,
+    'zsuri-rendszer'
+);
+
+// Optional: Set the branch that contains the stable release.
+$myUpdateChecker->setBranch('master');
+
+// Optional: Enable release assets.
+$myUpdateChecker->getVcsApi()->enableReleaseAssets();
 
 // Aktiváláskor szükséges adatbázis táblák létrehozása
 register_activation_hook(__FILE__, 'crp_install');
@@ -97,6 +113,14 @@ function zsuri_admin_menu() {
         'zsuri-users',
         'zsuri_users_page'
     );
+    add_submenu_page(
+        'zsuri-system',
+        'Linkek',
+        'Linkek',
+        'manage_options',
+        'zsuri-links',
+        'zsuri_links_page'
+    );
 }
 
 add_action('admin_init', 'zsuri_export_people_jury_csv_init');
@@ -151,10 +175,15 @@ function crp_export_ratings() {
         $table = $wpdb->prefix . 'crp_ratings';
         $history_table = $wpdb->prefix . 'crp_ratings_history';
         $criteria = get_option('crp_criteria', []);
-        $where = '';
+        // Build WHERE conditions based on provided filters (post and/or user)
+        $where_clauses = [];
         if (isset($_POST['filter_post']) && intval($_POST['filter_post']) > 0) {
-            $where = $wpdb->prepare("WHERE r.post_id = %d", intval($_POST['filter_post']));
+            $where_clauses[] = $wpdb->prepare("r.post_id = %d", intval($_POST['filter_post']));
         }
+        if (isset($_POST['filter_user']) && intval($_POST['filter_user']) > 0) {
+            $where_clauses[] = $wpdb->prepare("r.user_id = %d", intval($_POST['filter_user']));
+        }
+        $where = $where_clauses ? ('WHERE ' . implode(' AND ', $where_clauses)) : '';
         $query = "SELECT r.*, p.post_title, u.user_login 
                   FROM $table r
                   LEFT JOIN {$wpdb->posts} p ON r.post_id = p.ID
@@ -489,18 +518,25 @@ function crp_add_rating_form($content) {
     }
 
     // --- RATING FORM ---
+    $submissions_locked = get_option('zsuri_disable_submissions', 0);
     ?>
     <div class="crp-rating-box">
         <h3>Értékelés</h3>
+        <?php if ($submissions_locked && !current_user_can('administrator')): ?>
+            <div class="notice" style="margin:8px 0 12px; color:#a00;">
+                Az értékelések lezárásra kerültek. A korábbi pontjaidat megtekintheted, de módosítani nem tudod.
+            </div>
+        <?php endif; ?>
         <form method="post" class="crp-rating-form">
             <?php wp_nonce_field('crp_rating', 'crp_rating_nonce'); ?>
             <input type="hidden" name="crp_post_id" value="<?php echo $post_id; ?>">
             <?php foreach ($criteria as $i => $c):
                 $current_value = $existing_rating ? json_decode($existing_rating->criteria, true)[$i] : 0;
+                $stars_style = ($submissions_locked && !current_user_can('administrator')) ? 'style="pointer-events:none; user-select:none; opacity:0.7;"' : '';
             ?>
                 <div class="crp-criterion">
                     <label style="font-size:18px !important;"><?php echo esc_html($c); ?></label>
-                    <span class="crp-stars" data-index="<?php echo $i; ?>">
+                    <span class="crp-stars" data-index="<?php echo $i; ?>" <?php echo $stars_style; ?>>
                         <?php for ($s = 1; $s <= 5; $s++): ?>
                             <span class="crp-star <?php echo ($current_value >= $s) ? 'selected' : ''; ?>" data-star="<?php echo $s; ?>">&#9734;</span>
                         <?php endfor; ?>
@@ -510,9 +546,11 @@ function crp_add_rating_form($content) {
             <?php endforeach; ?>
             <div class="crp-comment-section">
                 <label>Saját jegyzeteim:</label><br>
-                <textarea name="crp_comment" rows="3" cols="50"><?php echo $existing_rating ? esc_textarea($existing_rating->comment) : ''; ?></textarea>
+                <textarea name="crp_comment" rows="3" cols="50" <?php echo ($submissions_locked && !current_user_can('administrator')) ? 'disabled' : ''; ?>><?php echo $existing_rating ? esc_textarea($existing_rating->comment) : ''; ?></textarea>
             </div>
-            <button type="submit" class="button"><?php echo $existing_rating ? 'Frissítés' : 'Értékelés mentése'; ?></button>
+            <?php if (!($submissions_locked && !current_user_can('administrator'))): ?>
+                <button type="submit" class="button"><?php echo $existing_rating ? 'Frissítés' : 'Értékelés mentése'; ?></button>
+            <?php endif; ?>
         </form>
     </div>
     <?php
@@ -539,6 +577,11 @@ function crp_save_rating() {
     }
 
     if (!is_user_logged_in()) return;
+
+    // Globális lezárás érvényesítése (admin kivétel)
+    if (get_option('zsuri_disable_submissions', 0) && !current_user_can('administrator')) {
+        return; // read-only módban semmit nem mentünk
+    }
 
     $user = wp_get_current_user();
     $allowed_roles = ['zsuri', 'administrator'];
@@ -615,7 +658,7 @@ function zsuri_categories_page() {
     if (!current_user_can('manage_options')) return;
 
     // Mentés feldolgozása
-    if (isset($_POST['submit_project_categories']) || isset($_POST['submit_people_categories'])) {
+    if (isset($_POST['submit_project_categories']) || isset($_POST['submit_people_categories']) || isset($_POST['submit_link_settings'])) {
         if (isset($_POST['project_categories'])) {
             $selected_project_cats = array_map('intval', $_POST['project_categories']);
             update_option('zsuri_project_categories', $selected_project_cats);
@@ -624,11 +667,24 @@ function zsuri_categories_page() {
             $selected_people_cats = array_map('intval', $_POST['people_categories']);
             update_option('zsuri_people_categories', $selected_people_cats);
         }
+        if (isset($_POST['disable_links_categories'])) {
+            $disable_links_cats = array_map('intval', $_POST['disable_links_categories']);
+            update_option('zsuri_disable_links_categories', $disable_links_cats);
+        }
         echo '<div class="notice notice-success"><p>Kategóriák frissítve!</p></div>';
+    }
+
+    // Értékelések és People sorrend lezárása beállítás mentése
+    if (isset($_POST['submit_lock_settings'])) {
+        $locked = isset($_POST['disable_submissions']) ? 1 : 0;
+        update_option('zsuri_disable_submissions', $locked);
+        echo '<div class="notice notice-success"><p>Beállítások frissítve!</p></div>';
     }
 
     $project_cats = get_option('zsuri_project_categories', []);
     $people_cats  = get_option('zsuri_people_categories', []);
+    $disable_links_cats = get_option('zsuri_disable_links_categories', []);
+    $submissions_locked = get_option('zsuri_disable_submissions', 0);
 
     // Összes kategória (nem csak nem üresek!)
     $all_cats = get_categories([
@@ -668,6 +724,39 @@ function zsuri_categories_page() {
             </div>
             <p class="submit">
                 <input type="submit" name="submit_people_categories" class="button button-primary" value="People kategóriák mentése">
+            </p>
+        </form>
+
+        <form method="post">
+            <h2 style="margin-bottom: 8px;">Link letiltás beállítások</h2>
+            <p style="margin-bottom: 10px; color: #666;">Válaszd ki azokat a kategóriákat, ahol a zsűri tagok ne tudjanak a pályázatokra kattintani (csak a címeket látják):</p>
+            <div style="max-height:300px; overflow-y:auto; border:1px solid #ddd; padding:10px;">
+                <?php foreach ($all_cats as $cat): ?>
+                    <label style="display:block; padding:5px;">
+                        <input type="checkbox" name="disable_links_categories[]" value="<?php echo esc_attr($cat->term_id); ?>"
+                            <?php checked(in_array($cat->term_id, $disable_links_cats)); ?>>
+                        <?php echo esc_html($cat->name); ?> (ID: <?php echo $cat->term_id; ?>)
+                    </label>
+                <?php endforeach; ?>
+            </div>
+            <p class="submit">
+                <input type="submit" name="submit_link_settings" class="button button-primary" value="Link beállítások mentése">
+            </p>
+        </form>
+
+        <form method="post" style="margin-top: 24px;">
+            <h2 style="margin-bottom: 8px;">Értékelések lezárása</h2>
+            <div style="border:1px solid #ddd; padding:10px; max-width:600px;">
+                <label style="display:block; padding:5px 0;">
+                    <input type="checkbox" name="disable_submissions" value="1" <?php checked($submissions_locked); ?>>
+                    Új értékelések és People sorrend mentésének letiltása (read-only mód)
+                </label>
+                <p style="color:#666; margin:6px 0 0 0; font-size:12px;">
+                    Ha be van kapcsolva, a zsűritagok látják a korábbi pontjaikat/sorrendjeiket, de nem tudnak új értékelést beküldeni vagy módosítani.
+                </p>
+            </div>
+            <p class="submit">
+                <input type="submit" name="submit_lock_settings" class="button button-primary" value="Beállítások mentése">
             </p>
         </form>
     </div>
@@ -795,6 +884,163 @@ function zsuri_users_page() {
     <?php
 }
 
+// Custom links admin page
+function zsuri_links_page() {
+    if (!current_user_can('manage_options')) return;
+
+    // Mentés feldolgozása
+    if (isset($_POST['save_custom_links'])) {
+        $category_id = intval($_POST['category_id']);
+        $post_links = $_POST['post_links'] ?? [];
+        $disable_links = $_POST['disable_links'] ?? [];
+        
+        // Validate and sanitize URLs
+        $sanitized_links = [];
+        foreach ($post_links as $post_id => $url) {
+            $post_id = intval($post_id);
+            
+            // Check if this post has link disabled
+            if (isset($disable_links[$post_id]) && $disable_links[$post_id] == '1') {
+                $sanitized_links[$post_id] = 'DISABLED';
+            } else {
+                $url = esc_url_raw(trim($url));
+                if (!empty($url)) {
+                    $sanitized_links[$post_id] = $url;
+                }
+            }
+        }
+        
+        // Also handle posts that only have disable checkbox checked (no URL entered)
+        foreach ($disable_links as $post_id => $disabled) {
+            $post_id = intval($post_id);
+            if ($disabled == '1' && !isset($sanitized_links[$post_id])) {
+                $sanitized_links[$post_id] = 'DISABLED';
+            }
+        }
+        
+        update_option('zsuri_custom_links_' . $category_id, $sanitized_links);
+        echo '<div class="notice notice-success"><p>Egyedi linkek mentve!</p></div>';
+    }
+
+    // Kategória kiválasztás
+    $all_cats = get_categories([
+        'taxonomy'   => 'category',
+        'hide_empty' => false,
+        'orderby'    => 'name'
+    ]);
+
+    $current_category = isset($_GET['category_id']) ? intval($_GET['category_id']) : 0;
+    $posts = [];
+    $existing_links = [];
+
+    if ($current_category > 0) {
+        // Get posts from selected category
+        $args = [
+            'cat'            => $current_category,
+            'posts_per_page' => -1,
+            'post_status'    => 'publish',
+            'orderby'        => 'title',
+            'order'          => 'ASC'
+        ];
+        $query = new WP_Query($args);
+        
+        if ($query->have_posts()) {
+            while ($query->have_posts()) {
+                $query->the_post();
+                $posts[] = [
+                    'id'    => get_the_ID(),
+                    'title' => get_the_title(),
+                    'url'   => get_permalink()
+                ];
+            }
+            wp_reset_postdata();
+        }
+
+        // Get existing custom links
+        $existing_links = get_option('zsuri_custom_links_' . $current_category, []);
+    }
+    ?>
+    <div class="wrap">
+        <h1>Egyedi linkek beállítása</h1>
+        
+        <form method="get" style="margin-bottom: 20px;">
+            <input type="hidden" name="page" value="zsuri-links">
+            <label for="category_id">Kategória kiválasztása: </label>
+            <select name="category_id" id="category_id" onchange="this.form.submit()">
+                <option value="0">-- Válassz kategóriát --</option>
+                <?php foreach ($all_cats as $cat): ?>
+                    <option value="<?php echo esc_attr($cat->term_id); ?>" 
+                            <?php selected($current_category, $cat->term_id); ?>>
+                        <?php echo esc_html($cat->name); ?> (ID: <?php echo $cat->term_id; ?>)
+                    </option>
+                <?php endforeach; ?>
+            </select>
+        </form>
+
+        <?php if ($current_category > 0 && !empty($posts)): ?>
+            <form method="post">
+                <input type="hidden" name="category_id" value="<?php echo esc_attr($current_category); ?>">
+                
+                <h2>Egyedi linkek beállítása a "<?php echo esc_html(get_cat_name($current_category)); ?>" kategóriához</h2>
+                <p style="margin-bottom: 15px; color: #666;">
+                    Itt állíthatod be az egyedi linkeket, amelyek a zsűri tagok számára jelennek meg. 
+                    Ha üresen hagyod egy mezőt, akkor az eredeti WordPress link fog megjelenni.
+                    A "Link letiltás" opcióval kikapcsolhatod a linket egy adott pályázatnál.
+                </p>
+
+                <table class="widefat" style="margin-bottom: 20px;">
+                    <thead>
+                        <tr>
+                            <th style="width: 35%;">Pályázat címe</th>
+                            <th style="width: 25%;">Eredeti link</th>
+                            <th style="width: 25%;">Egyedi link</th>
+                            <th style="width: 15%;">Link letiltás</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach ($posts as $post): ?>
+                            <tr>
+                                <td>
+                                    <strong><?php echo esc_html($post['title']); ?></strong>
+                                </td>
+                                <td>
+                                    <a href="<?php echo esc_url($post['url']); ?>" target="_blank" style="font-size: 12px;">
+                                        <?php echo esc_html($post['url']); ?>
+                                    </a>
+                                </td>
+                                <td>
+                                    <input type="url" 
+                                           name="post_links[<?php echo esc_attr($post['id']); ?>]" 
+                                           value="<?php echo esc_attr($existing_links[$post['id']] ?? ''); ?>"
+                                           style="width: 100%;"
+                                           placeholder="https://example.com">
+                                </td>
+                                <td>
+                                    <label style="display: block; margin: 0;">
+                                        <input type="checkbox" 
+                                               name="disable_links[<?php echo esc_attr($post['id']); ?>]" 
+                                               value="1"
+                                               <?php checked(isset($existing_links[$post['id']]) && $existing_links[$post['id']] === 'DISABLED'); ?>>
+                                        Link letiltása
+                                    </label>
+                                </td>
+                            </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+
+                <p class="submit">
+                    <input type="submit" name="save_custom_links" class="button button-primary" value="Egyedi linkek mentése">
+                </p>
+            </form>
+        <?php elseif ($current_category > 0): ?>
+            <div class="notice notice-info">
+                <p>Nincsenek pályázatok ebben a kategóriában.</p>
+            </div>
+        <?php endif; ?>
+    </div>
+    <?php
+}
 
 
 // Shortcode-ok regisztrálása
@@ -952,18 +1198,41 @@ if (count($user_categories) === 1 && $category) {
     echo '<form id="people-jury-sort-form" method="post">';
     echo '<input type="hidden" name="jury_people_category" value="' . esc_attr($current_category) . '">';
     echo '<h3>Pályázók sorrendje (rendezd a pályázókat prioritási sorrendbe, legfelülre a legjobbat):</h3>';
-    echo '<ul id="people-jury-sortable" style="list-style:none; padding:0; margin:0 0 20px 0; max-width:500px;">';
+    $submissions_locked = get_option('zsuri_disable_submissions', 0);
+    if ($submissions_locked && !current_user_can('administrator')) {
+        echo '<div class="notice" style="margin:8px 0 12px; color:#a00;">A sorrendek mentése jelenleg le van tiltva. A jelenlegi sorrendedet látod, de nem módosíthatod.</div>';
+    }
+    // Ellenőrizzük, hogy a jelenlegi kategóriában letiltottak-e a linkek
+    $disable_links_categories = get_option('zsuri_disable_links_categories', []);
+    $links_disabled = in_array($current_category, $disable_links_categories);
+
+    $ul_style_lock = ($submissions_locked && !current_user_can('administrator')) ? 'pointer-events:none; user-select:none; opacity:0.85;' : '';
+    echo '<ul id="people-jury-sortable" style="list-style:none; padding:0; margin:0 0 20px 0; max-width:500px; ' . $ul_style_lock . "">';
     foreach ($ordered_posts as $post) {
         echo '<li class="people-jury-sort-item" data-post-id="' . esc_attr($post['id']) . '" style="padding:10px 16px; margin-bottom:6px; border:1px solid #ccc; background:#fafaff; cursor:move;">';
         if ($post['thumbnail']) {
             echo '<img src="' . esc_url($post['thumbnail']) . '" alt="" style="width:40px;height:40px;object-fit:cover;vertical-align:middle;margin-right:10px;border-radius:3px;">';
         }
-        echo '<span style="vertical-align:middle;"><a href="' . esc_url($post['link']) . '" target="_blank" style="font-weight:bold;">' . esc_html($post['title']) . '</a></span>';
+        // Check for custom links first
+        $custom_links = get_option('zsuri_custom_links_' . $current_category, []);
+        $custom_link = $custom_links[$post['id']] ?? '';
+        
+        if ($links_disabled) {
+            echo '<span style="vertical-align:middle; font-weight:bold; color: #333;">' . esc_html($post['title']) . '</span>';
+        } elseif ($custom_link === 'DISABLED') {
+            echo '<span style="vertical-align:middle; font-weight:bold; color: #333;">' . esc_html($post['title']) . '</span>';
+        } elseif (!empty($custom_link)) {
+            echo '<span style="vertical-align:middle;"><a href="' . esc_url($custom_link) . '" target="_blank" style="font-weight:bold;">' . esc_html($post['title']) . '</a></span>';
+        } else {
+            echo '<span style="vertical-align:middle;"><a href="' . esc_url($post['link']) . '" target="_blank" style="font-weight:bold;">' . esc_html($post['title']) . '</a></span>';
+        }
         echo '</li>';
     }
     echo '</ul>';
     echo '<input type="hidden" name="jury_sort_order" id="jury_sort_order" value="">';
-    echo '<button type="submit" class="button button-primary">Sorrend mentése</button>';
+    if (!($submissions_locked && !current_user_can('administrator'))) {
+        echo '<button type="submit" class="button button-primary">Sorrend mentése</button>';
+    }
     echo '</form>';
 
     if (isset($_GET['jury_sort_saved']) && $_GET['jury_sort_saved'] == '1') {
@@ -1323,6 +1592,10 @@ function save_people_jury_sort_order() {
         is_user_logged_in() &&
         isset($_POST['jury_people_category'])
     ) {
+        // Globális lezárás érvényesítése (admin kivétel)
+        if (get_option('zsuri_disable_submissions', 0) && !current_user_can('administrator')) {
+            return; // read-only: ne mentsünk új sorrendet
+        }
         $user = wp_get_current_user();
 
         $ok = false;

@@ -1,109 +1,74 @@
-# Zsuri Rendszer - WordPress Plugin
+# Zsuri Rendszer WordPress Plugin
 
-Ez a WordPress plugin egy zsűri rendszert biztosít, amely lehetővé teszi a felhasználók számára, hogy szavazzanak különböző kategóriákban.
+A WordPress plugin for managing jury voting and evaluation systems.
 
-## Funkciók
+## Features
 
-### 🎯 Alapvető funkciók
-- **Szavazási rendszer**: Felhasználók szavazhatnak különböző kategóriákban
-- **Kategória kezelés**: Több szavazási kategória támogatása
-- **AJAX szavazás**: Dinamikus szavazás JavaScript segítségével
-- **Reszponzív design**: Mobilbarát felület
+- **Jury Rating System**: Allows jury members to rate posts based on custom criteria
+- **People Jury Sorting**: Enables jury members to sort and rank people/contestants
+- **Custom Links Management**: Set custom URLs for posts in specific categories
+- **Category Management**: Configure which categories are available for jury evaluation
+- **User Management**: Assign jury members to specific categories and types
+- **Export Functionality**: Export ratings and results to CSV format
 
-### 🎨 Testreszabási lehetőségek
-- **Stílus testreszabás**: CSS osztályok a megjelenés módosításához
-- **JavaScript API**: Programozott hozzáférés a szavazási funkciókhoz
-- **Hook rendszer**: WordPress hook-ok a bővítéshez
+## Installation
 
-## Telepítés
+1. Upload the `jury-system.php` file to your `/wp-content/plugins/zsuri-rendszer/` directory
+2. Activate the plugin through the 'Plugins' menu in WordPress
+3. Configure the plugin through the 'Zsűri rendszer' admin menu
 
-### 1. Fájlok feltöltése
-1. Töltsd fel a plugin fájljait a WordPress `wp-content/plugins/zsuri-rendszer/` mappába
-2. Vagy csomagold be a fájlokat ZIP formátumban és telepítsd a WordPress admin panelen keresztül
+## Auto-Updates
 
-### 2. Plugin aktiválása
-1. Menj a WordPress admin panelbe
-2. Navigálj a **Beépülő modulok** > **Telepített beépülő modulok** menüpontra
-3. Keresd meg a "Zsuri Rendszer" beépülő modult
-4. Kattints az **Aktiválás** gombra
+This plugin includes automatic update functionality using the Plugin Update Checker library. Updates will be available through the WordPress admin interface when new versions are released on GitHub.
 
-## Használat
+### Update Process
 
-### 1. Shortcode használata
-A plugin shortcode-ot biztosít a szavazási rendszer megjelenítéséhez:
+1. New versions are automatically detected
+2. Updates appear in WordPress Admin → Plugins → Available Updates
+3. One-click update process through WordPress admin
 
-```
-[zsuri_rendszer]
-```
+## Configuration
 
-### 2. JavaScript API
-```javascript
-// Szavazás küldése
-zsuriVote(categoryId, optionId);
+### Setting Up Categories
 
-// Szavazási eredmények lekérése
-getVoteResults(categoryId);
-```
+1. Go to **Zsűri rendszer → Kategóriák**
+2. Select which categories should be available for project and people jury evaluation
+3. Configure link disable settings if needed
 
-## CSS osztályok
+### Managing Custom Links
 
-A plugin a következő CSS osztályokat használja:
-- `.zsuri-container`: Fő konténer
-- `.zsuri-category`: Kategória konténer
-- `.zsuri-option`: Szavazási opció
-- `.zsuri-vote-button`: Szavazás gomb
-- `.zsuri-results`: Eredmények megjelenítése
+1. Go to **Zsűri rendszer → Linkek**
+2. Select a category
+3. Set custom URLs for posts in that category
+4. These custom links will be used instead of the original WordPress links
 
-## AJAX funkciók
+### Assigning Jury Members
 
-A plugin AJAX segítségével működik:
-- **Szavazás**: Dinamikus szavazás oldal újratöltés nélkül
-- **Eredmények**: Valós idejű eredmények frissítése
-- **Hiba kezelés**: Felhasználóbarát hibaüzenetek
+1. Go to **Zsűri rendszer → Zsűri tagok**
+2. Select users with the 'zsuri' role
+3. Assign them to specific categories and jury types (project/people)
 
-## Biztonság
+## Shortcodes
 
-- **Nonce ellenőrzés**: Minden AJAX kérés nonce ellenőrzéssel védett
-- **Felhasználó ellenőrzés**: Csak bejelentkezett felhasználók szavazhatnak
-- **Duplikált szavazás védelem**: Egy felhasználó csak egyszer szavazhat kategóriánként
+- `[jury_to_rate]` - Shows posts that need to be rated
+- `[jury_rated]` - Shows already rated posts
+- `[people_jury_sort]` - Shows people jury sorting interface
+- `[jury_info_project]` - Shows project jury information
+- `[jury_info_people]` - Shows people jury information
 
-## Hibaelhárítás
+## Version History
 
-### Szavazás nem működik
-1. Ellenőrizd, hogy a felhasználó be van-e jelentkezve
-2. Nézd meg a böngésző konzolját JavaScript hibákért
-3. Ellenőrizd a WordPress debug log-ot
+- **1.3.0**: Added Plugin Update Checker for automatic GitHub updates
+- **1.2.1**: Fixed plugin update recognition
+- **1.2.0**: Added custom links management feature
+- **1.1.0**: Added link disable functionality for specific categories
+- **1.0.0**: Initial release
 
-### AJAX hibák
-1. Ellenőrizd, hogy az AJAX URL helyes-e
-2. Nézd meg a hálózati fülön a kéréseket
-3. Ellenőrizd a WordPress permalink beállításokat
+## Requirements
 
-## Verzió információk
+- WordPress 5.0 or higher
+- PHP 7.0 or higher
 
-- **Verzió**: 1.0.0
-- **PHP verzió**: 7.0+
-- **WordPress verzió**: 5.0+
-- **JavaScript**: ES6+ támogatás
+## Support
 
-## Licenc
-
-Ez a plugin GPL v2 vagy újabb licenc alatt érhető el.
-
-## Támogatás
-
-Ha problémába ütközöl vagy kérdésed van, kérlek hozz létre egy issue-t a GitHub repository-ban.
-
-## Közreműködés
-
-A közreműködéseket szívesen fogadjuk! Kérlek:
-1. Fork-old a repository-t
-2. Hozz létre egy feature branch-et
-3. Commit-old a változtatásaidat
-4. Push-old a branch-et
-5. Hozz létre egy Pull Request-et
-
----
-
-**Fejlesztő**: ZeusWeb  
-**Utolsó frissítés**: 2024. január 
+For support and updates, visit the GitHub repository: https://github.com/whaitey/zsuri-rendszer 
