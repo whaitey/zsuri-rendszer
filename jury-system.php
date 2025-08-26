@@ -3,7 +3,7 @@
  * Plugin Name: Zsuri Rendszer
  * Plugin URI: https://github.com/whaitey/zsuri-rendszer
  * Description: Zsűri szavazási rendszer WordPress plugin
- * Version: 1.3.4
+ * Version: 1.3.5
  * Author: ZeusWeb
  * Text Domain: zsuri-rendszer
  * Requires at least: 5.0
@@ -1207,7 +1207,7 @@ if (count($user_categories) === 1 && $category) {
     $links_disabled = in_array($current_category, $disable_links_categories);
 
     $ul_style_lock = ($submissions_locked && !current_user_can('administrator')) ? 'pointer-events:none; user-select:none; opacity:0.85;' : '';
-    echo '<ul id="people-jury-sortable" style="list-style:none; padding:0; margin:0 0 20px 0; max-width:500px; ' . $ul_style_lock . "">';
+    echo '<ul id="people-jury-sortable" style="list-style:none; padding:0; margin:0 0 20px 0; max-width:500px; ' . $ul_style_lock . '">';
     foreach ($ordered_posts as $post) {
         echo '<li class="people-jury-sort-item" data-post-id="' . esc_attr($post['id']) . '" style="padding:10px 16px; margin-bottom:6px; border:1px solid #ccc; background:#fafaff; cursor:move;">';
         if ($post['thumbnail']) {
